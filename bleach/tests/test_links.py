@@ -2,11 +2,12 @@ import urllib
 
 from nose.tools import eq_
 
-from bleach import linkify, url_re
+from bleach import linkify, url_re, DEFAULT_CALLBACKS as DC
 
 
-def filter_url(url):
-    return u'http://bouncer/?u=%s' % urllib.quote_plus(url)
+def filter_url(attrs):
+    attrs['href'] = u'http://bouncer/?u=%s' % urllib.quote_plus(attrs['href'])
+    return attrs
 
 
 def test_url_re():
@@ -46,7 +47,7 @@ def test_trailing_slash():
 def test_mangle_link():
     eq_('<a href="http://bouncer/?u=http%3A%2F%2Fexample.com" rel="nofollow">'
         'http://example.com</a>',
-        linkify('http://example.com', filter_url=filter_url))
+        linkify('http://example.com', DC + [filter_url]))
 
 
 def test_email_link():
@@ -63,7 +64,7 @@ def test_email_link():
     eq_('email to <a href="james@example.com" rel="nofollow">'
         'james@example.com</a>',
         linkify('email to <a href="james@example.com">'
-        'james@example.com</a>', parse_email=True))
+                'james@example.com</a>', parse_email=True))
 
 
 def test_email_link_escaping():
@@ -97,7 +98,7 @@ def test_escaping():
 
 def test_nofollow_off():
     eq_('<a href="http://example.com">example.com</a>',
-        linkify(u'example.com', nofollow=False))
+        linkify(u'example.com', []))
 
 
 def test_link_in_html():

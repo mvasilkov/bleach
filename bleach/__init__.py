@@ -8,11 +8,12 @@ import html5lib
 from html5lib.sanitizer import HTMLSanitizer
 from html5lib.serializer.htmlserializer import HTMLSerializer
 
-from encoding import force_unicode
-from sanitizer import BleachSanitizer
+import .callbacks
+from .encoding import force_unicode
+from .sanitizer import BleachSanitizer
 
 
-VERSION = (1, 1, 1)
+VERSION = (1, 2, 0)
 __version__ = '.'.join(map(str, VERSION))
 
 __all__ = ['clean', 'linkify']
@@ -83,7 +84,7 @@ email_re = re.compile(
 
 NODE_TEXT = 4  # The numeric ID of a text node in simpletree.
 
-identity = lambda x: x  # The identity function.
+DEFAULT_CALLBACKS = [callbacks.nofollow]
 
 
 def clean(text, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRIBUTES,
@@ -108,28 +109,14 @@ def clean(text, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRIBUTES,
     return _render(parser.parseFragment(text)).strip()
 
 
-def linkify(text, nofollow=True, target=None, filter_url=identity,
-            filter_text=identity, skip_pre=False, parse_email=False):
+def linkify(text, callbacks=DEFAULT_CALLBACKS, skip_pre=False,
+            parse_email=False):
     """Convert URL-like strings in an HTML fragment to links.
 
     linkify() converts strings that look like URLs or domain names in a
     blob of text that may be an HTML fragment to links, while preserving
     (a) links already in the string, (b) urls found in attributes, and
     (c) email addresses.
-
-    If the nofollow argument is True (the default) then rel="nofollow"
-    will be added to links created by linkify() as well as links already
-    found in the text.
-
-    The target argument will optionally add a target attribute with the
-    given value to links created by linkify() as well as links already
-    found in the text.
-
-    linkify() uses up to two filters on each link. For links created by
-    linkify(), the href attribute is passed through filter_url()
-    and the text of the link is passed through filter_text(). For links
-    already found in the document, the href attribute is passed through
-    filter_url(), but the text is untouched.
     """
     text = force_unicode(text)
 
@@ -193,6 +180,11 @@ def linkify(text, nofollow=True, target=None, filter_url=identity,
 
         return fragment, opening_parentheses, closing_parentheses
 
+    def apply_callbacks(attrs, new):
+        for cb in callbacks:
+            attrs = cb(attrs, new)
+        return attrs
+
     def linkify_nodes(tree, parse_text=True):
         for node in tree.childNodes:
             if node.type == NODE_TEXT and parse_text:
@@ -207,12 +199,12 @@ def linkify(text, nofollow=True, target=None, filter_url=identity,
                 replace_nodes(tree, new_frag, node)
             elif node.name == 'a':
                 if 'href' in node.attributes:
-                    if nofollow:
-                        node.attributes['rel'] = 'nofollow'
-                    if target is not None:
-                        node.attributes['target'] = target
-                    href = node.attributes['href']
-                    node.attributes['href'] = filter_url(href)
+                    attrs = node.attributes
+                    attrs['_text'] = node.childNodes.toxml()  # XXX(james): ?
+                    attrs = apply_callbacks(attrs, False)
+                    text = attrs.pop('_text')
+                    node.attributes = attrs
+                    # TODO(james): Fix innerText.
             elif skip_pre and node.name == 'pre':
                 linkify_nodes(node, False)
             else:
