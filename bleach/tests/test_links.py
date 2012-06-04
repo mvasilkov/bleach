@@ -100,7 +100,6 @@ def test_nofollow_off():
     eq_('<a href="http://example.com">example.com</a>',
         linkify(u'example.com', []))
 
-
 def test_link_in_html():
     eq_('<i><a href="http://yy.com" rel="nofollow">http://yy.com</a></i>',
         linkify('<i>http://yy.com</i>'))
@@ -295,11 +294,3 @@ def test_ports():
 
     for test, output in tests:
         yield check, test, output
-
-
-def test_target():
-    eq_('<a href="http://example.com" rel="nofollow" '
-        'target="_blank">example.com</a>',
-        linkify(u'example.com', target='_blank'))
-    eq_('<a href="http://example.com" target="_blank">example.com</a>',
-        linkify(u'example.com', target='_blank', nofollow=False))

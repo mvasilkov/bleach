@@ -8,7 +8,7 @@ import html5lib
 from html5lib.sanitizer import HTMLSanitizer
 from html5lib.serializer.htmlserializer import HTMLSerializer
 
-import .callbacks
+from . import callbacks as linkify_callbacks
 from .encoding import force_unicode
 from .sanitizer import BleachSanitizer
 
@@ -84,7 +84,7 @@ email_re = re.compile(
 
 NODE_TEXT = 4  # The numeric ID of a text node in simpletree.
 
-DEFAULT_CALLBACKS = [callbacks.nofollow]
+DEFAULT_CALLBACKS = [linkify_callbacks.nofollow]
 
 
 def clean(text, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRIBUTES,
@@ -126,11 +126,6 @@ def linkify(text, callbacks=DEFAULT_CALLBACKS, skip_pre=False,
     parser = html5lib.HTMLParser(tokenizer=HTMLSanitizer)
 
     forest = parser.parseFragment(text)
-
-    if nofollow:
-        rel = u'rel="nofollow"'
-    else:
-        rel = u''
 
     def replace_nodes(tree, new_frag, node):
         new_tree = parser.parseFragment(new_frag)
@@ -200,11 +195,13 @@ def linkify(text, callbacks=DEFAULT_CALLBACKS, skip_pre=False,
             elif node.name == 'a':
                 if 'href' in node.attributes:
                     attrs = node.attributes
-                    attrs['_text'] = node.childNodes.toxml()  # XXX(james): ?
+                    attrs['_text'] = ''.join(c.toxml() for c in node.childNodes)
                     attrs = apply_callbacks(attrs, False)
                     text = attrs.pop('_text')
                     node.attributes = attrs
-                    # TODO(james): Fix innerText.
+                    for n in node.childNodes:
+                        node.removeChild(n)
+                    node.insertText(text)
             elif skip_pre and node.name == 'pre':
                 linkify_nodes(node, False)
             else:
@@ -231,14 +228,24 @@ def linkify(text, callbacks=DEFAULT_CALLBACKS, skip_pre=False,
         else:
             href = u''.join([u'http://', url])
 
-        repl = u'%s<a href="%s" %s>%s</a>%s%s'
+        link = {
+            '_text': url,
+            'href': href,
+        }
 
-        attribs = [rel]
-        if target is not None:
-            attribs.append('target="%s"' % target)
+        link = apply_callbacks(link, True)
+
+        if link is None:
+            return url
+
+        _text = link.pop('_text')
+        _href = link.pop('href')
+
+        repl = u'%s<a href="%s" %s>%s</a>%s%s'
+        attribs = ['%s="%s"' % (k, v) for k, v in link.items()]
 
         return repl % ('(' * open_brackets,
-                       filter_url(href), ' '.join(attribs), filter_text(url),
+                       _href, ' '.join(attribs), _text,
                        end, ')' * close_brackets)
 
     linkify_nodes(forest)
