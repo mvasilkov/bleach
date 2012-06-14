@@ -23,12 +23,27 @@ ALLOWED_TAGS = [
     'acronym',
     'b',
     'blockquote',
+    'br',
     'code',
+    'div',
     'em',
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
+    'hr',
     'i',
+    'img',
     'li',
     'ol',
+    'p',
+    'pre',
+    'span',
     'strong',
+    'sub',
+    'sup',
     'ul',
 ]
 
@@ -36,6 +51,7 @@ ALLOWED_ATTRIBUTES = {
     'a': ['href', 'title'],
     'abbr': ['title'],
     'acronym': ['title'],
+    'img': ['alt', 'src', 'title'],
 }
 
 ALLOWED_STYLES = []
